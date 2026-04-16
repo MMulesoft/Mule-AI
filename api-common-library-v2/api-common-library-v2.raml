@@ -1,0 +1,432 @@
+#%RAML 1.0 Library
+
+usage: |
+  Cette bibliothèque commune contient des définitions standardisées pour les APIs selon les meilleures pratiques MuleSoft:
+  - Types de données communs
+  - Réponses d'erreur standardisées  
+  - Traits de sécurité
+  - Traits de pagination
+  - Headers HTTP communs
+  - Patterns de validation
+
+# =============================================================================
+# TYPES DE DONNÉES COMMUNS
+# =============================================================================
+
+types:
+  # Identifiants standardisés
+  UUID:
+    type: string
+    pattern: ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$
+    example: 123e4567-e89b-12d3-a456-426614174000
+    description: Identifiant unique universel conforme RFC 4122
+
+  ID:
+    type: string
+    minLength: 1
+    maxLength: 50
+    pattern: ^[a-zA-Z0-9_-]+$
+    example: "12345"
+    description: Identifiant alphanumérique simple
+
+  # Types temporels
+  DateTime:
+    type: datetime
+    format: rfc3339
+    example: 2024-01-15T10:30:00Z
+    description: Date et heure au format ISO 8601 / RFC 3339
+
+  Date:
+    type: date-only
+    example: 2024-01-15
+    description: Date au format YYYY-MM-DD
+
+  # Types de métadonnées
+  Metadata:
+    type: object
+    properties:
+      createdAt:
+        type: DateTime
+        description: Date de création de l'entité
+      updatedAt:
+        type: DateTime
+        description: Date de dernière modification
+      createdBy?:
+        type: string
+        description: Identifiant de l'utilisateur créateur
+      updatedBy?:
+        type: string
+        description: Identifiant de l'utilisateur ayant effectué la dernière modification
+      version?:
+        type: integer
+        minimum: 1
+        description: Version de l'entité pour la gestion de concurrence optimiste
+
+  # Types de pagination
+  PaginationRequest:
+    type: object
+    properties:
+      offset?:
+        type: integer
+        minimum: 0
+        default: 0
+        description: Nombre d'éléments à ignorer
+      limit?:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+        description: Nombre maximum d'éléments à retourner
+
+  PaginationResponse:
+    type: object
+    properties:
+      offset:
+        type: integer
+        minimum: 0
+        description: Nombre d'éléments ignorés
+      limit:
+        type: integer
+        minimum: 1
+        description: Nombre maximum d'éléments demandés
+      total:
+        type: integer
+        minimum: 0
+        description: Nombre total d'éléments disponibles
+      count:
+        type: integer
+        minimum: 0
+        description: Nombre d'éléments retournés dans cette page
+
+  # Types d'erreur standardisés
+  ErrorDetail:
+    type: object
+    properties:
+      code:
+        type: string
+        description: Code d'erreur technique
+        example: "VALIDATION_ERROR"
+      message:
+        type: string
+        description: Message d'erreur lisible
+        example: "Le champ 'email' est requis"
+      field?:
+        type: string
+        description: Champ concerné par l'erreur
+        example: "email"
+      value?:
+        type: string
+        description: Valeur rejetée
+      timestamp:
+        type: DateTime
+        description: Horodatage de l'erreur
+      correlationId?:
+        type: UUID
+        description: Identifiant de corrélation pour le suivi
+
+  ErrorResponse:
+    type: object
+    properties:
+      error:
+        type: object
+        properties:
+          code:
+            type: string
+            description: Code d'erreur principal
+          message:
+            type: string
+            description: Message d'erreur principal
+          details?:
+            type: ErrorDetail[]
+            description: Détails des erreurs
+          correlationId?:
+            type: UUID
+            description: Identifiant de corrélation
+          timestamp:
+            type: DateTime
+            description: Horodatage de l'erreur
+    example:
+      error:
+        code: "BAD_REQUEST"
+        message: "Données d'entrée invalides"
+        details:
+          - code: "VALIDATION_ERROR"
+            message: "L'adresse email est invalide"
+            field: "email"
+            value: "invalid-email"
+            timestamp: "2024-01-15T10:30:00Z"
+        correlationId: "123e4567-e89b-12d3-a456-426614174000"
+        timestamp: "2024-01-15T10:30:00Z"
+
+  # Types d'adresse standardisés
+  Address:
+    type: object
+    properties:
+      street:
+        type: string
+        maxLength: 255
+        description: Adresse (numéro, rue)
+      city:
+        type: string
+        maxLength: 100
+        description: Ville
+      postalCode:
+        type: string
+        pattern: ^[0-9]{5}$
+        description: Code postal français
+      country:
+        type: string
+        enum: [FR, BE, CH, LU, MC]
+        default: FR
+        description: Code pays ISO 3166-1 alpha-2
+    example:
+      street: "123 Rue de la République"
+      city: "Paris"
+      postalCode: "75001"
+      country: "FR"
+
+  # Types de contact
+  Contact:
+    type: object
+    properties:
+      email:
+        type: string
+        pattern: ^[^\s@]+@[^\s@]+\.[^\s@]+$
+        description: Adresse email valide
+      phone?:
+        type: string
+        pattern: ^\+33[1-9](?:[0-9]{8})$
+        description: Numéro de téléphone français au format international
+    example:
+      email: "contact@example.com"
+      phone: "+33123456789"
+
+# =============================================================================
+# TRAITS DE SÉCURITÉ
+# =============================================================================
+
+traits:
+  # Authentification OAuth 2.0
+  oauth2Protected:
+    headers:
+      Authorization:
+        description: Token Bearer OAuth 2.0
+        type: string
+        pattern: ^Bearer\s+.+
+        example: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    responses:
+      401:
+        description: Non autorisé - Token manquant ou invalide
+        body:
+          application/json:
+            type: ErrorResponse
+            example:
+              error:
+                code: "UNAUTHORIZED"
+                message: "Token d'authentification requis"
+                timestamp: "2024-01-15T10:30:00Z"
+      403:
+        description: Accès interdit - Permissions insuffisantes
+        body:
+          application/json:
+            type: ErrorResponse
+
+  # Authentification par clé API
+  apiKeyProtected:
+    headers:
+      X-API-Key:
+        description: Clé d'API
+        type: string
+        minLength: 32
+        maxLength: 128
+        example: "sk_test_123456789abcdef..."
+    responses:
+      401:
+        description: Clé API manquante ou invalide
+        body:
+          application/json:
+            type: ErrorResponse
+
+  # Limitation de taux (Rate Limiting)
+  rateLimited:
+    headers:
+      X-RateLimit-Limit?:
+        description: Limite de requêtes par fenêtre temporelle
+        type: integer
+        example: 1000
+      X-RateLimit-Remaining?:
+        description: Nombre de requêtes restantes
+        type: integer
+        example: 999
+      X-RateLimit-Reset?:
+        description: Timestamp de réinitialisation du compteur
+        type: integer
+        example: 1642248600
+    responses:
+      429:
+        description: Trop de requêtes - Limite de taux dépassée
+        headers:
+          Retry-After:
+            description: Nombre de secondes avant de pouvoir refaire une requête
+            type: integer
+            example: 60
+        body:
+          application/json:
+            type: ErrorResponse
+            example:
+              error:
+                code: "RATE_LIMIT_EXCEEDED"
+                message: "Limite de requêtes dépassée"
+                timestamp: "2024-01-15T10:30:00Z"
+
+  # Pagination
+  paginated:
+    queryParameters:
+      offset?:
+        description: Nombre d'éléments à ignorer
+        type: integer
+        minimum: 0
+        default: 0
+        example: 0
+      limit?:
+        description: Nombre maximum d'éléments à retourner
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+        example: 20
+    headers:
+      X-Total-Count?:
+        description: Nombre total d'éléments disponibles
+        type: integer
+        example: 150
+
+  # Tri des résultats
+  sortable:
+    queryParameters:
+      sort?:
+        description: |
+          Critères de tri au format: field1:asc,field2:desc
+          Utiliser 'asc' pour croissant, 'desc' pour décroissant
+        type: string
+        pattern: ^([a-zA-Z][a-zA-Z0-9_]*:(asc|desc)(,[a-zA-Z][a-zA-Z0-9_]*:(asc|desc))*)$
+        example: "name:asc,createdAt:desc"
+
+  # Filtrage
+  filterable:
+    queryParameters:
+      filter?:
+        description: |
+          Filtres au format JSON ou query string
+          Exemple: {"status": "active", "type": "premium"}
+        type: string
+        example: '{"status":"active","type":"premium"}'
+
+  # Headers de corrélation et traçage
+  traceable:
+    headers:
+      X-Correlation-ID?:
+        description: Identifiant de corrélation pour le suivi des requêtes
+        type: UUID
+        example: "123e4567-e89b-12d3-a456-426614174000"
+      X-Request-ID?:
+        description: Identifiant unique de la requête
+        type: UUID
+        example: "987fcdeb-51a2-43d1-b456-426614174001"
+    responses:
+      200:
+        headers:
+          X-Correlation-ID?:
+            description: Identifiant de corrélation retourné
+            type: UUID
+          X-Request-ID?:
+            description: Identifiant de requête retourné
+            type: UUID
+
+  # Cache control
+  cacheable:
+    responses:
+      200:
+        headers:
+          Cache-Control?:
+            description: Directives de mise en cache
+            type: string
+            example: "public, max-age=3600"
+          ETag?:
+            description: Identifiant de version pour le cache conditionnel
+            type: string
+            example: '"33a64df551425fcc55e4d42a148795d9f25f89d4"'
+          Last-Modified?:
+            description: Date de dernière modification
+            type: datetime
+            format: rfc2616
+            example: "Wed, 15 Jan 2024 10:30:00 GMT"
+      304:
+        description: Non modifié - Utiliser la version en cache
+
+  # Validation conditionnelle
+  conditionalRequest:
+    headers:
+      If-Match?:
+        description: ETag conditionnel pour les mises à jour
+        type: string
+        example: '"33a64df551425fcc55e4d42a148795d9f25f89d4"'
+      If-None-Match?:
+        description: ETag conditionnel pour les lectures
+        type: string
+        example: '"33a64df551425fcc55e4d42a148795d9f25f89d4"'
+      If-Modified-Since?:
+        description: Date conditionnelle
+        type: datetime
+        format: rfc2616
+        example: "Wed, 15 Jan 2024 10:30:00 GMT"
+    responses:
+      412:
+        description: Précondition échouée
+        body:
+          application/json:
+            type: ErrorResponse
+
+  # Réponses standard communes (trait additionnel)
+  standardResponses:
+    responses:
+      400:
+        description: Requête invalide - Données d'entrée incorrectes
+        body:
+          application/json:
+            type: ErrorResponse
+            example:
+              error:
+                code: "BAD_REQUEST"
+                message: "Données d'entrée invalides"
+                timestamp: "2024-01-15T10:30:00Z"
+      404:
+        description: Ressource non trouvée
+        body:
+          application/json:
+            type: ErrorResponse
+            example:
+              error:
+                code: "NOT_FOUND"
+                message: "La ressource demandée n'existe pas"
+                timestamp: "2024-01-15T10:30:00Z"
+      500:
+        description: Erreur interne du serveur
+        body:
+          application/json:
+            type: ErrorResponse
+            example:
+              error:
+                code: "INTERNAL_SERVER_ERROR"
+                message: "Une erreur inattendue s'est produite"
+                timestamp: "2024-01-15T10:30:00Z"
+      503:
+        description: Service temporairement indisponible
+        body:
+          application/json:
+            type: ErrorResponse
+            example:
+              error:
+                code: "SERVICE_UNAVAILABLE"
+                message: "Service temporairement indisponible"
+                timestamp: "2024-01-15T10:30:00Z"
