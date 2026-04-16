@@ -1,0 +1,33 @@
+{
+  "main": "api-common-library-v2.raml",
+  "name": "API Common Library v2 - Governance Compliant",
+  "description": "Bibliothèque commune conforme aux meilleures pratiques MuleSoft pour la gouvernance d'API. Contient des types standardisés, traits de sécurité, gestion d'erreur et patterns de validation.",
+  "classifier": "raml-fragment",
+  "organizationId": "d33b7e22-e38e-4829-9472-c774d2ac83e4",
+  "descriptorVersion": "1.0.0",
+  "groupId": "d33b7e22-e38e-4829-9472-c774d2ac83e4",
+  "assetId": "api-common-library-v2",
+  "version": "2.0.0",
+  "tags": [
+    "governance",
+    "best-practices",
+    "common-library",
+    "raml-fragment",
+    "security",
+    "pagination",
+    "error-handling",
+    "oauth2",
+    "rate-limiting",
+    "traceability"
+  ],
+  "categories": [
+    "API Governance",
+    "Common Libraries",
+    "Security"
+  ],
+  "customFields": {
+    "compliance": "Anypoint Best Practices v1.6.3",
+    "maturityLevel": "Production",
+    "supportTeam": "API Governance Team"
+  }
+}
